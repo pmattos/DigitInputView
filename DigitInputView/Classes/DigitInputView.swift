@@ -18,7 +18,7 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
-*/
+ */
 
 import UIKit
 
@@ -26,96 +26,72 @@ public enum DigitInputViewAnimationType: Int {
     case none, dissolve, spring
 }
 
+// MARK: -
+
 public protocol DigitInputViewDelegate: class {
     func digitsDidChange(digitInputView: DigitInputView)
 }
 
+// MARK: -
+
 open class DigitInputView: UIView {
     
-    /**
-    The number of digits to show, which will be the maximum length of the final string
-    */
+    // MARK: - Properties
+    
+    /// The number of digits to show, which will be the maximum length of the final string.
     open var numberOfDigits: Int = 4 {
-        
         didSet {
-            setup()
+            setUp()
         }
-        
     }
     
-    /**
-    The color of the line under each digit
-    */
+    /// The color of the line under each digit.
     open var bottomBorderColor = UIColor.lightGray {
-        
         didSet {
-            setup()
+            setUp()
         }
-        
     }
     
-    /**
-     The color of the line under next digit
-     */
+    /// The color of the line under next digit.
     open var nextDigitBottomBorderColor = UIColor.gray {
-        
         didSet {
-            setup()
+            setUp()
         }
-        
     }
     
-    /**
-    The color of the digits
-    */
+    /// The color of the digits.
     open var textColor: UIColor = .black {
-        
         didSet {
-            setup()
+            setUp()
         }
-        
     }
     
-    /**
-    If not nil, only the characters in this string are acceptable. The rest will be ignored.
-    */
-    open var acceptableCharacters: String? = nil
-    
-    /**
-    The keyboard type that shows up when entering characters
-    */
+    /// The keyboard type that shows up when entering characters
     open var keyboardType: UIKeyboardType = .default {
-        
         didSet {
-            setup()
+            setUp()
         }
-        
     }
     
-    /**
-     Keyboard appearance type. `default` or `light`, `dark` and `alert`.
-    */
+    /// The keyboard appearance style.
     open var keyboardAppearance: UIKeyboardAppearance = .default {
-        
         didSet {
-            setup()
+            setUp()
         }
-        
     }
     
-    /// The animatino to use to show new digits
+    /// Only the characters in this string are acceptable.
+    /// The rest will be ignored.
+    open var acceptableCharacters = CharacterSet.decimalDigits
+    
+    /// The animation to use to show new digits.
     open var animationType: DigitInputViewAnimationType = .spring
     
-    /**
-    The font of the digits. Although font size will be calculated automatically.
-    */
+    /// The font of the digits (although font size will be calculated automatically).
     open var font: UIFont?
     
-    /**
-    The string that the user has entered
-    */
+    /// The string that the user has entered.
     open var text: String {
-        
         get {
             guard let textField = textField else { return "" }
             return textField.text ?? ""
@@ -130,122 +106,60 @@ open class DigitInputView: UIView {
     fileprivate var textField: UITextField?
     fileprivate var tapGestureRecognizer: UITapGestureRecognizer?
     
-    fileprivate var underlineHeight: CGFloat = 4
-    fileprivate var spacing: CGFloat = 8
+    private let underlineHeight: CGFloat = 4
+    private let spacing: CGFloat = 8
     
-    override open var canBecomeFirstResponder: Bool {
-        
-        get {
-            return true
-        }
-        
-    }
+    // MARK: - Initializers
     
     override init(frame: CGRect) {
-        
         super.init(frame: frame)
-        setup()
-        
+        setUp()
     }
     
     required public init?(coder aDecoder: NSCoder) {
-        
         super.init(coder: aDecoder)
-        setup()
-        
+        setUp()
     }
     
-    override open func becomeFirstResponder() -> Bool {
-        
-        guard let textField = textField else { return false }
-        textField.becomeFirstResponder()
-        return true
-        
-    }
-    
-    override open func resignFirstResponder() -> Bool {
-        
-        guard let textField = textField else { return true }
-        textField.resignFirstResponder()
-        return true
-        
-    }
-    
-    override open func layoutSubviews() {
-        
-        super.layoutSubviews()
-        
-        // width to height ratio
-        let ratio: CGFloat = 0.75
-        
-        // Now we find the optimal font size based on the view size
-        // and set the frame for the labels
-        var characterWidth = frame.height * ratio
-        var characterHeight = frame.height
-        
-        // if using the current width, the digits go off the view, recalculate
-        // based on width instead of height
-        if (characterWidth + spacing) * CGFloat(numberOfDigits) + spacing > frame.width {
-            characterWidth = (frame.width - spacing * CGFloat(numberOfDigits + 1)) / CGFloat(numberOfDigits)
-            characterHeight = characterWidth / ratio
-        }
-        
-        let extraSpace = frame.width - CGFloat(numberOfDigits - 1) * spacing - CGFloat(numberOfDigits) * characterWidth
-        
-        // font size should be less than the available vertical space
-        let fontSize = characterHeight * 0.8
-        
-        let y = (frame.height - characterHeight) / 2
-        for (index, label) in labels.enumerated() {
-            let x = extraSpace / 2 + (characterWidth + spacing) * CGFloat(index)
-            label.frame = CGRect(x: x, y: y, width: characterWidth, height: characterHeight)
-            
-            underlines[index].frame = CGRect(x: x, y: frame.height - underlineHeight, width: characterWidth, height: underlineHeight)
-            
-            if let font = font {
-                label.font = font.withSize(fontSize)
-            }
-            else {
-                label.font = label.font.withSize(fontSize)
-            }
-        }
-        
-    }
-    
-    /**
-     Sets up the required views
-     */
-    fileprivate func setup() {
-        
-        isUserInteractionEnabled = true
+    /// Sets up the required views.
+    private func setUp() {
         clipsToBounds = true
+        isUserInteractionEnabled = true
         
+        if textField.superview == nil {
+            textField.frame = CGRect(x: 0, y: -40, width: 100, height: 30) // Hidden field.
+            addSubview(textField)
+        }
+        textField.delegate = self
+        textField.keyboardType = keyboardType
+        textField.keyboardAppearance = keyboardAppearance
+        textField.addTarget(
+            self,
+            action: #selector(textFieldEditingChanged),
+            for: .editingChanged
+        )
+
         if tapGestureRecognizer == nil {
-            tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(viewTapped(_:)))
+            tapGestureRecognizer = UITapGestureRecognizer(
+                target: self,
+                action: #selector(viewTapped(_:))
+            )
             addGestureRecognizer(tapGestureRecognizer!)
         }
-        
-        if textField == nil {
-            textField = UITextField()
-            textField?.delegate = self
-            textField?.frame = CGRect(x: 0, y: -40, width: 100, height: 30)
-            addSubview(textField!)
-        }
-        
-        textField?.keyboardType = keyboardType
-        textField?.keyboardAppearance = keyboardAppearance
-        
-        // Since this function isn't called frequently, we just remove everything
-        // and recreate them. Don't need to optimize it.
-        
+
+        setUpLabelsAndUnderlines()
+    }
+    
+    /// Since this function isn't called frequently, we just
+    /// remove everything and recreate them. Don't need to optimize it.
+    private func setUpLabelsAndUnderlines() {
         for label in labels {
             label.removeFromSuperview()
         }
-        labels.removeAll()
-        
         for underline in underlines {
             underline.removeFromSuperview()
         }
+        labels.removeAll()
         underlines.removeAll()
         
         for i in 0..<numberOfDigits {
@@ -255,23 +169,86 @@ open class DigitInputView: UIView {
             label.textColor = textColor
             
             let underline = UIView()
-            underline.backgroundColor = i == 0 ? nextDigitBottomBorderColor : bottomBorderColor
+            if i == 0 {
+                underline.backgroundColor = nextDigitBottomBorderColor
+            } else {
+                underline.backgroundColor = bottomBorderColor
+            }
             
             addSubview(label)
             addSubview(underline)
             labels.append(label)
             underlines.append(underline)
         }
-        
     }
     
-    /**
-     Handles tap gesture on the view
-    */
-    @objc fileprivate func viewTapped(_ sender: UITapGestureRecognizer) {
+    // MARK: - First Responder
+    
+    override open var canBecomeFirstResponder: Bool {
+        get {
+            return true
+        }
+    }
+    
+    override open func becomeFirstResponder() -> Bool {
+        return textField.becomeFirstResponder()
+    }
+    
+    override open func resignFirstResponder() -> Bool {
+        return textField.resignFirstResponder()
+    }
+    
+    override open func layoutSubviews() {
+        super.layoutSubviews()
         
-        textField!.becomeFirstResponder()
+        /// Maximun number of digits as CGFloat.
+        let numberOfDigits = CGFloat(self.numberOfDigits)
         
+        // Width to height ratio.
+        let ratio: CGFloat = 0.75
+        
+        // Now we find the optimal font size based on the view size
+        // and set the frame for the labels.
+        var characterWidth = frame.height * ratio
+        var characterHeight = frame.height
+        
+        // If using the current width, the digits go off the view, recalculate
+        // based on width instead of height.
+        if (characterWidth + spacing) * numberOfDigits + spacing > frame.width {
+            characterWidth = (frame.width - spacing * (numberOfDigits + 1)) / numberOfDigits
+            characterHeight = characterWidth / ratio
+        }
+        
+        let extraSpace = frame.width - (numberOfDigits - 1) * spacing -
+                         numberOfDigits * characterWidth
+        
+        // Font size should be less than the available vertical space.
+        let fontSize = characterHeight * 0.8
+        
+        let y = (frame.height - characterHeight) / 2
+        for (index, label) in labels.enumerated() {
+            let x = extraSpace / 2 + (characterWidth + spacing) * CGFloat(index)
+            label.frame = CGRect(x: x, y: y, width: characterWidth, height: characterHeight)
+            
+            underlines[index].frame = CGRect(x: x, y: frame.height - underlineHeight,
+                                             width: characterWidth, height: underlineHeight)
+            
+            if let font = font {
+                label.font = font.withSize(fontSize)
+            }
+            else {
+                label.font = label.font.withSize(fontSize)
+            }
+        }
+    }
+    
+    /// Handles tap gesture on the view.
+    @objc private func viewTapped(_ sender: UITapGestureRecognizer) {
+        textField.becomeFirstResponder()
+    }
+    
+    @objc private func textFieldEditingChanged() {
+        textDidChange()
     }
     
     /**
@@ -292,17 +269,17 @@ open class DigitInputView: UIView {
             }
         }
         
-        // set all the bottom borders color to default
+        // Set all the bottom borders color to default.
         for underline in underlines {
             underline.backgroundColor = bottomBorderColor
         }
         
-        let nextIndex = text.count + 1
-        if labels.count > 0, nextIndex < labels.count + 1 {
-            // set the next digit bottom border color
-            underlines[nextIndex - 1].backgroundColor = nextDigitBottomBorderColor
+        let nextIndex = text.count
+        if labels.count > 0 && nextIndex < labels.count {
+            // Set the next digit bottom border color.
+            underlines[nextIndex].backgroundColor = nextDigitBottomBorderColor
         }
-
+        
         delegate?.digitsDidChange(digitInputView: self)
     }
     
@@ -311,8 +288,7 @@ open class DigitInputView: UIView {
     /// - parameter label: The label to change text of
     /// - parameter newText: The new string for the label
     private func changeText(of label: UILabel, newText: String, _ animated: Bool = false) {
-        
-        if !animated || animationType == .none {
+        guard animated && animationType != .none else {
             label.text = newText
             return
         }
