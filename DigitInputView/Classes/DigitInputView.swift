@@ -41,42 +41,50 @@ open class DigitInputView: UIView {
     /// The number of digits to show, which will be the maximum length of the final string.
     open var numberOfDigits: Int = 4 {
         didSet {
-            setUp()
+            configureLabelsAndUnderlines()
         }
     }
     
     /// The color of the line under each digit.
     open var bottomBorderColor = UIColor.lightGray {
         didSet {
-            setUp()
+            configureLabelsAndUnderlines()
         }
     }
     
     /// The color of the line under next digit.
     open var nextDigitBottomBorderColor = UIColor.gray {
         didSet {
-            setUp()
+            configureLabelsAndUnderlines()
         }
     }
     
     /// The color of the digits.
     open var textColor: UIColor = .black {
         didSet {
-            setUp()
+            configureLabelsAndUnderlines()
         }
     }
     
     /// The keyboard type that shows up when entering characters
     open var keyboardType: UIKeyboardType = .default {
         didSet {
-            setUp()
+            configureTextField()
         }
     }
     
     /// The keyboard appearance style.
     open var keyboardAppearance: UIKeyboardAppearance = .default {
         didSet {
-            setUp()
+            configureTextField()
+        }
+    }
+    
+    /// Provides the keyboard with extra information
+    /// about the semantic intent of the text document.
+    open var textContentType: UITextContentType! = nil {
+        didSet {
+            configureTextField()
         }
     }
     
@@ -93,18 +101,21 @@ open class DigitInputView: UIView {
     /// The string that the user has entered.
     open var text: String {
         get {
-            guard let textField = textField else { return "" }
             return textField.text ?? ""
         }
         
     }
 
+    /// The view's delegate.
     open weak var delegate: DigitInputViewDelegate?
     
-    fileprivate var labels = [UILabel]()
-    fileprivate var underlines = [UIView]()
-    fileprivate var textField: UITextField?
-    fileprivate var tapGestureRecognizer: UITapGestureRecognizer?
+    // MARK: - Private Properties
+
+    private var textField: UITextField!
+    private var labels = [UILabel]()
+    private var underlines = [UIView]()
+
+    private var tapGestureRecognizer: UITapGestureRecognizer!
     
     private let underlineHeight: CGFloat = 4
     private let spacing: CGFloat = 8
@@ -113,46 +124,51 @@ open class DigitInputView: UIView {
     
     override init(frame: CGRect) {
         super.init(frame: frame)
-        setUp()
+        configureViews()
     }
     
     required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
-        setUp()
+        configureViews()
     }
     
-    /// Sets up the required views.
-    private func setUp() {
+    /// Configures the required views.
+    private func configureViews() {
         clipsToBounds = true
         isUserInteractionEnabled = true
-        
-        if textField.superview == nil {
+
+        tapGestureRecognizer = UITapGestureRecognizer(
+            target: self,
+            action: #selector(viewTapped(_:))
+        )
+        addGestureRecognizer(tapGestureRecognizer)
+
+        configureTextField()
+        configureLabelsAndUnderlines()
+    }
+    
+    /// Configures Sets up the text field?
+    private func configureTextField() {
+        // First time initialization.
+        if textField == nil {
+            textField = UITextField()
             textField.frame = CGRect(x: 0, y: -40, width: 100, height: 30) // Hidden field.
+            textField.addTarget(
+                self,
+                action: #selector(textFieldEditingChanged),
+                for: .editingChanged
+            )
             addSubview(textField)
         }
         textField.delegate = self
         textField.keyboardType = keyboardType
         textField.keyboardAppearance = keyboardAppearance
-        textField.addTarget(
-            self,
-            action: #selector(textFieldEditingChanged),
-            for: .editingChanged
-        )
-
-        if tapGestureRecognizer == nil {
-            tapGestureRecognizer = UITapGestureRecognizer(
-                target: self,
-                action: #selector(viewTapped(_:))
-            )
-            addGestureRecognizer(tapGestureRecognizer!)
-        }
-
-        setUpLabelsAndUnderlines()
+        if #available(iOS 10.0, *) { textField.textContentType = textContentType }
     }
     
     /// Since this function isn't called frequently, we just
     /// remove everything and recreate them. Don't need to optimize it.
-    private func setUpLabelsAndUnderlines() {
+    private func configureLabelsAndUnderlines() {
         for label in labels {
             label.removeFromSuperview()
         }
@@ -185,9 +201,7 @@ open class DigitInputView: UIView {
     // MARK: - First Responder
     
     override open var canBecomeFirstResponder: Bool {
-        get {
-            return true
-        }
+        return true
     }
     
     override open func becomeFirstResponder() -> Bool {
@@ -297,17 +311,25 @@ open class DigitInputView: UIView {
             label.frame.origin.y = frame.height
             label.text = newText
             
-            UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.1, initialSpringVelocity: 1, options: .curveEaseInOut, animations: { 
-                label.frame.origin.y = self.frame.height - label.frame.height
-            }, completion: nil)
+            UIView.animate(
+                withDuration: 0.2, delay: 0,
+                usingSpringWithDamping: 0.1, initialSpringVelocity: 1,
+                options: .curveEaseInOut, animations: {
+                    label.frame.origin.y = self.frame.height - label.frame.height
+                },
+                completion: nil
+            )
         }
         else if animationType == .dissolve {
-            UIView.transition(with: label,
-                              duration: 0.4,
-                              options: .transitionCrossDissolve,
-                              animations: {
-                                label.text = newText
-            }, completion: nil)
+            UIView.transition(
+                with: label,
+                duration: 0.4,
+                options: .transitionCrossDissolve,
+                animations: {
+                    label.text = newText
+                },
+                completion: nil
+            )
         }
     }
     
