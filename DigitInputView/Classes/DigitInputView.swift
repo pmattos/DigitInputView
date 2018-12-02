@@ -103,7 +103,10 @@ open class DigitInputView: UIView {
         get {
             return textField.text ?? ""
         }
-        
+        set {
+            textField.text = newValue
+            textDidChange()
+        }
     }
 
     /// The view's delegate.
@@ -265,20 +268,15 @@ open class DigitInputView: UIView {
         textDidChange()
     }
     
-    /**
-     Called when the text changes so that the labels get updated
-    */
-    fileprivate func didChange(_ backspaced: Bool = false) {
-        
-        guard let textField = textField, let text = textField.text else { return }
-        
+    /// Called when the text changes so that the labels get updated.
+    fileprivate func textDidChange() {
         for item in labels {
             item.text = ""
         }
         
         for (index, item) in text.enumerated() {
             if labels.count > index {
-                let animate = index == text.count - 1 && !backspaced
+                let animate = index == text.count - 1
                 changeText(of: labels[index], newText: String(item), animate)
             }
         }
@@ -335,38 +333,33 @@ open class DigitInputView: UIView {
     
 }
 
+// MARK: - TextField Delegate
 
-// MARK: TextField Delegate
 extension DigitInputView: UITextFieldDelegate {
     
-    public func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+    public func textField(_ textField: UITextField,
+                          shouldChangeCharactersIn range: NSRange,
+                          replacementString: String) -> Bool {
         
-        let char = string.cString(using: .utf8)
-        let isBackSpace = strcmp(char, "\\b")
-        if isBackSpace == -92 {
-            textField.text!.removeLast()
-            didChange(true)
-            return false
-        }
+        let oldText = textField.text ?? ""
+        let newText = oldText.replacingCharacters(in: Range(range, in: oldText)!,
+                                                  with: replacementString)
         
-        if textField.text?.count ?? 0 >= numberOfDigits {
-            return false
-        }
+        guard newText.count <= numberOfDigits else { return false }
+        guard acceptableCharacters.contains(charactersIn: newText) else { return false }
         
-        guard let acceptableCharacters = acceptableCharacters else {
-            textField.text = (textField.text ?? "") + string
-            didChange()
-            return false
-        }
-        
-        if acceptableCharacters.contains(string) {
-            textField.text = (textField.text ?? "") + string
-            didChange()
-            return false
-        }
-        
-        return false
-        
+        return true
     }
+}
+
+// MARK: - Helpers
+
+fileprivate extension CharacterSet {
     
+    /// Returns `true` if all characters in the
+    /// specified string are contained in this set.
+    func contains(charactersIn string: String) -> Bool {
+        let stringCharsSet = CharacterSet(charactersIn: string)
+        return self.isSuperset(of: stringCharsSet)
+    }
 }
