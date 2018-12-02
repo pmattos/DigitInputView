@@ -215,6 +215,19 @@ open class DigitInputView: UIView {
         return textField.resignFirstResponder()
     }
     
+    private var _inputAccessoryView: UIView?
+
+    /// Adds a custom accessory view to the system-supplied keyboard.
+    ///
+    /// By default, the `UIResponder` superclass declares
+    /// this as a *read-only* property with a `nil` value.
+    open override var inputAccessoryView: UIView? {
+        get { return _inputAccessoryView }
+        set { _inputAccessoryView = newValue }
+    }
+    
+    // MARK: - Layout & Interaction
+
     override open func layoutSubviews() {
         super.layoutSubviews()
         
@@ -331,6 +344,18 @@ open class DigitInputView: UIView {
         }
     }
     
+    // MARK: - Accessibility
+    
+    /// Controls if the internal textField should be exposed as an accessibility element.
+    open func setAccessibilityElement(_ isAccessibilityElement: Bool,
+                                      withIdentifier accessibilityIdentifier: String? = nil) {
+        precondition(
+            !isAccessibilityElement || !self.isAccessibilityElement,
+            "Superview will hide text field subview"
+        )
+        textField.isAccessibilityElement = isAccessibilityElement
+        textField.accessibilityIdentifier = accessibilityIdentifier
+    }
 }
 
 // MARK: - TextField Delegate
